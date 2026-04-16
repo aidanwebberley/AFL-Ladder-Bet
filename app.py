@@ -8,6 +8,102 @@ import datetime
 # --- CONFIG & CONSTANTS ---
 st.set_page_config(page_title="AFL Ladder Bet", layout="wide", page_icon="🏉")
 
+# --- CUSTOM CSS ---
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+    
+    html, body, [class*="css"]  {
+        font-family: 'Outfit', sans-serif;
+    }
+    .stApp {
+        background-color: #070b10;
+        color: #f8fafc;
+    }
+    
+    /* Hide some default Streamlit elements for a cleaner look */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
+    /* Premium Ladder Styles */
+    .ladder-container {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 1rem 0;
+    }
+    .ladder-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 16px 24px;
+        transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .ladder-row:hover {
+        background: rgba(255, 255, 255, 0.06);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+        border-color: rgba(56, 189, 248, 0.3);
+    }
+    .ladder-row.benchmark {
+        border-left: 4px solid #facc15;
+    }
+    .ladder-row.human {
+        border-left: 4px solid #38bdf8;
+    }
+    
+    .ladder-left {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+    .ladder-rank {
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: #475569;
+        width: 30px;
+        text-align: right;
+    }
+    .ladder-name {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #f8fafc;
+    }
+    .ladder-row.benchmark .ladder-name {
+        color: #facc15; /* Yellow for benchmarks */
+    }
+    .ladder-row.human .ladder-name {
+        color: #38bdf8; /* Blue for humans */
+    }
+    
+    .ladder-right {
+        text-align: right;
+    }
+    .ladder-score {
+        font-size: 2rem;
+        font-weight: 800;
+        color: #f8fafc;
+        text-shadow: 0 0 10px rgba(255,255,255,0.2);
+    }
+    .ladder-sub {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    /* Top 3 Embellishments */
+    .ladder-row[data-rank="1"] .ladder-rank { color: #fbbf24; }
+    .ladder-row[data-rank="2"] .ladder-rank { color: #94a3b8; }
+    .ladder-row[data-rank="3"] .ladder-rank { color: #b45309; }
+</style>
+""", unsafe_allow_html=True)
+
 PREDICTIONS = {
     "Antony": ["Geelong", "Brisbane Lions", "Hawthorn", "Sydney Swans", "Western Bulldogs", "Adelaide", "Gold Coast SUNS", "Fremantle", "Collingwood", "GWS GIANTS", "St Kilda", "Melbourne", "Carlton", "Port Adelaide", "North Melbourne", "Essendon", "Richmond", "West Coast Eagles"],
     "Slammy": ["Brisbane Lions", "Western Bulldogs", "Gold Coast SUNS", "Collingwood", "Adelaide", "Geelong", "Sydney Swans", "Fremantle", "St Kilda", "GWS GIANTS", "Hawthorn", "Melbourne", "Port Adelaide", "North Melbourne", "Carlton", "Richmond", "Essendon", "West Coast Eagles"],
@@ -163,9 +259,18 @@ with tab1:
             fig1 = px.line(
                 df_humans, x="Round", y="Score", color="Entity", markers=True,
                 title="Total Points (Lower is Better)",
-                template="plotly_dark"
+                template="plotly_dark",
+                line_shape="spline"
             )
-            fig1.update_yaxes(autorange="reversed") # Lower score is better
+            fig1.update_yaxes(autorange="reversed", showgrid=False, zeroline=False) # Lower score is better
+            fig1.update_xaxes(showgrid=False, zeroline=False)
+            fig1.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)', 
+                plot_bgcolor='rgba(0,0,0,0)', 
+                font=dict(family="Outfit"),
+                hovermode="x unified",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
             st.plotly_chart(fig1, use_container_width=True)
             
             # --- Graph 2: The Full Field ---
@@ -175,7 +280,15 @@ with tab1:
                 line_dash="Type", title="Total Points (Lower is Better)",
                 template="plotly_dark"
             )
-            fig2.update_yaxes(autorange="reversed")
+            fig2.update_yaxes(autorange="reversed", showgrid=False, zeroline=False)
+            fig2.update_xaxes(showgrid=False, zeroline=False)
+            fig2.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)', 
+                plot_bgcolor='rgba(0,0,0,0)', 
+                font=dict(family="Outfit"),
+                hovermode="x unified",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
             st.plotly_chart(fig2, use_container_width=True)
             
             # --- Graph 3: Live Leaderboard ---
@@ -191,17 +304,37 @@ with tab1:
                     "Type": "Human" if entity in HUMANS else "Benchmark"
                 })
             
-            df_live = pd.DataFrame(current_scores).sort_values(by="Score")
+            df_live = pd.DataFrame(current_scores).sort_values(by="Score").reset_index(drop=True)
             
-            fig3 = px.bar(
-                df_live, x="Entity", y="Score", color="Type", text="Score",
-                color_discrete_map={"Human": "#1f77b4", "Benchmark": "#ff7f0e"},
-                title="Current Total Scores (Lower is Better)",
-                template="plotly_dark"
-            )
-            # Make sure lower score looks visually preferred or at least sorted properly
-            fig3.update_traces(textposition='auto')
-            st.plotly_chart(fig3, use_container_width=True)
+            # Generate Custom HTML Ladder
+            html_ladder = '<div class="ladder-container">'
+            for idx, row in df_live.iterrows():
+                rank = idx + 1
+                entity_name = row['Entity']
+                score = row['Score']
+                entity_type = row['Type'].lower()  # 'human' or 'benchmark'
+                
+                # Assign crowns/medals to top 3
+                rank_display = f"#{rank}"
+                if rank == 1: rank_display = "🥇"
+                elif rank == 2: rank_display = "🥈"
+                elif rank == 3: rank_display = "🥉"
+                
+                html_ladder += f"""
+                <div class="ladder-row {entity_type}" data-rank="{rank}">
+                    <div class="ladder-left">
+                        <div class="ladder-rank">{rank_display}</div>
+                        <div class="ladder-name">{entity_name}</div>
+                    </div>
+                    <div class="ladder-right">
+                        <div class="ladder-score">{int(score)}</div>
+                        <div class="ladder-sub">DAMAGE</div>
+                    </div>
+                </div>
+                """
+            html_ladder += '</div>'
+            
+            st.markdown(html_ladder, unsafe_allow_html=True)
 
 with tab2:
     st.header("Prediction Breakdown")
