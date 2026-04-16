@@ -30,31 +30,45 @@ ALL_ENTITIES = HUMANS + BENCHMARKS
 YEAR = datetime.datetime.now().year
 
 # --- API HELPERS ---
+HEADERS = {"User-Agent": "AFL_Dashboard_App/1.0"}
+
 @st.cache_data(ttl=3600)
 def fetch_games_for_year(year=YEAR):
     url = f"https://api.squiggle.com.au/?q=games&year={year}"
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json().get('games', [])
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=10)
+        if response.status_code == 200:
+            return response.json().get('games', [])
+    except Exception:
+        pass
     return []
 
 @st.cache_data(ttl=3600)
 def fetch_live_ladder():
-    url = "https://api.squiggle.com.au/?q=standings"
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json().get('standings', [])
-        # Sort by rank to ensure order
-        return sorted(data, key=lambda x: x['rank'])
+    # If the current year has no data, fallback to previous years
+    current_year = datetime.datetime.now().year
+    for year in [current_year, current_year - 1, current_year - 2, 2024]:
+        url = f"https://api.squiggle.com.au/?q=standings&year={year}"
+        try:
+            response = requests.get(url, headers=HEADERS, timeout=10)
+            if response.status_code == 200:
+                data = response.json().get('standings', [])
+                if data:
+                    return sorted(data, key=lambda x: x['rank'])
+        except Exception:
+            pass
     return []
 
 @st.cache_data(ttl=3600)
 def fetch_historical_ladder(year, round_num):
     url = f"https://api.squiggle.com.au/?q=standings&year={year}&round={round_num}"
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json().get('standings', [])
-        return sorted(data, key=lambda x: x['rank'])
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=10)
+        if response.status_code == 200:
+            data = response.json().get('standings', [])
+            return sorted(data, key=lambda x: x['rank'])
+    except Exception:
+        pass
     return []
 
 # --- DATA PROCESSING ---
