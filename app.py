@@ -101,6 +101,44 @@ st.markdown("""
     .ladder-row[data-rank="1"] .ladder-rank { color: #fbbf24; }
     .ladder-row[data-rank="2"] .ladder-rank { color: #94a3b8; }
     .ladder-row[data-rank="3"] .ladder-rank { color: #b45309; }
+    
+    /* Modern Table Styles */
+    .table-wrapper {
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.1);
+        margin-top: 1rem;
+        background: rgba(255, 255, 255, 0.02);
+    }
+    .modern-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .modern-table th {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 14px 20px;
+        text-align: left;
+        color: #94a3b8;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 1px;
+        border-bottom: 2px solid rgba(255,255,255,0.1);
+    }
+    .modern-table td {
+        padding: 14px 20px;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        color: #e2e8f0;
+    }
+    .modern-table tr:last-child td {
+        border-bottom: none;
+    }
+    .modern-table tr:hover {
+        background: rgba(255,255,255,0.04);
+    }
+    .tag-green { background: rgba(5,150,105,0.2); color: #34d399; border: 1px solid rgba(5,150,105,0.5); padding: 4px 10px; border-radius: 8px; font-weight:700; display: inline-block;}
+    .tag-yellow { background: rgba(217,119,6,0.2); color: #fbbf24; border: 1px solid rgba(217,119,6,0.5); padding: 4px 10px; border-radius: 8px; font-weight:700; display: inline-block;}
+    .tag-red { background: rgba(220,38,38,0.2); color: #f87171; border: 1px solid rgba(220,38,38,0.5); padding: 4px 10px; border-radius: 8px; font-weight:700; display: inline-block;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -253,47 +291,6 @@ with tab1:
         if historical_scores:
             df_history = pd.DataFrame(historical_scores)
             
-            # --- Graph 1: Competitors Only ---
-            st.subheader("Competitor Progression Over Time")
-            df_humans = df_history[df_history["Type"] == "Human"]
-            fig1 = px.line(
-                df_humans, x="Round", y="Score", color="Entity", markers=True,
-                title="Total Points (Lower is Better)",
-                template="plotly_dark",
-                line_shape="spline"
-            )
-            fig1.update_yaxes(autorange="reversed", showgrid=False, zeroline=False) # Lower score is better
-            fig1.update_xaxes(showgrid=False, zeroline=False)
-            fig1.update_layout(
-                paper_bgcolor='rgba(0,0,0,0)', 
-                plot_bgcolor='rgba(0,0,0,0)', 
-                font=dict(family="Outfit"),
-                hovermode="x unified",
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-            )
-            st.plotly_chart(fig1, use_container_width=True)
-            
-            # --- Graph 2: The Full Field ---
-            st.subheader("Full Field (Including Benchmarks)")
-            fig2 = px.line(
-                df_history, x="Round", y="Score", color="Entity", markers=True,
-                line_dash="Type", title="Total Points (Lower is Better)",
-                template="plotly_dark"
-            )
-            fig2.update_yaxes(autorange="reversed", showgrid=False, zeroline=False)
-            fig2.update_xaxes(showgrid=False, zeroline=False)
-            fig2.update_layout(
-                paper_bgcolor='rgba(0,0,0,0)', 
-                plot_bgcolor='rgba(0,0,0,0)', 
-                font=dict(family="Outfit"),
-                hovermode="x unified",
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-            )
-            st.plotly_chart(fig2, use_container_width=True)
-            
-            # --- Graph 3: Live Leaderboard ---
-            st.subheader("Current Live Leaderboard")
-            
             # Use the very latest ladder for the live scoreboard
             current_scores = []
             for entity in ALL_ENTITIES:
@@ -303,38 +300,80 @@ with tab1:
                     "Score": score,
                     "Type": "Human" if entity in HUMANS else "Benchmark"
                 })
-            
             df_live = pd.DataFrame(current_scores).sort_values(by="Score").reset_index(drop=True)
-            
-            # Generate Custom HTML Ladder
-            html_ladder = '<div class="ladder-container">'
-            for idx, row in df_live.iterrows():
-                rank = idx + 1
-                entity_name = row['Entity']
-                score = row['Score']
-                entity_type = row['Type'].lower()  # 'human' or 'benchmark'
+
+            # Create columns: Left for Ladder (1 part), Right for Graphs (2 parts)
+            col_ladder, col_graphs = st.columns([1, 2])
+
+            with col_ladder:
+                st.subheader("Current Live Leaderboard")
                 
-                # Assign crowns/medals to top 3
-                rank_display = f"#{rank}"
-                if rank == 1: rank_display = "🥇"
-                elif rank == 2: rank_display = "🥈"
-                elif rank == 3: rank_display = "🥉"
+                # Generate Custom HTML Ladder
+                html_ladder = '<div class="ladder-container">\n'
+                for idx, row in df_live.iterrows():
+                    rank = idx + 1
+                    entity_name = row['Entity']
+                    score = row['Score']
+                    entity_type = row['Type'].lower()  # 'human' or 'benchmark'
+                    
+                    # Assign crowns/medals to top 3
+                    rank_display = f"#{rank}"
+                    if rank == 1: rank_display = "🥇"
+                    elif rank == 2: rank_display = "🥈"
+                    elif rank == 3: rank_display = "🥉"
+                    
+                    # Dedented HTML string to avoid Streamlit parsing it as a Markdown code block
+                    html_ladder += f"""<div class="ladder-row {entity_type}" data-rank="{rank}">
+<div class="ladder-left">
+<div class="ladder-rank">{rank_display}</div>
+<div class="ladder-name">{entity_name}</div>
+</div>
+<div class="ladder-right">
+<div class="ladder-score">{int(score)}</div>
+<div class="ladder-sub">DAMAGE</div>
+</div>
+</div>\n"""
+                html_ladder += '</div>'
+                st.markdown(html_ladder, unsafe_allow_html=True)
+
+            with col_graphs:
+                # --- Graph 1: Competitors Only ---
+                st.subheader("Competitor Progression Over Time")
+                df_humans = df_history[df_history["Type"] == "Human"]
+                fig1 = px.line(
+                    df_humans, x="Round", y="Score", color="Entity", markers=True,
+                    title="Total Points (Lower is Better)",
+                    template="plotly_dark",
+                    line_shape="spline"
+                )
+                fig1.update_yaxes(autorange="reversed", showgrid=False, zeroline=False) # Lower score is better
+                fig1.update_xaxes(showgrid=False, zeroline=False)
+                fig1.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)', 
+                    plot_bgcolor='rgba(0,0,0,0)', 
+                    font=dict(family="Outfit"),
+                    hovermode="x unified",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                )
+                st.plotly_chart(fig1, use_container_width=True)
                 
-                html_ladder += f"""
-                <div class="ladder-row {entity_type}" data-rank="{rank}">
-                    <div class="ladder-left">
-                        <div class="ladder-rank">{rank_display}</div>
-                        <div class="ladder-name">{entity_name}</div>
-                    </div>
-                    <div class="ladder-right">
-                        <div class="ladder-score">{int(score)}</div>
-                        <div class="ladder-sub">DAMAGE</div>
-                    </div>
-                </div>
-                """
-            html_ladder += '</div>'
-            
-            st.markdown(html_ladder, unsafe_allow_html=True)
+                # --- Graph 2: The Full Field ---
+                st.subheader("Full Field (Including Benchmarks)")
+                fig2 = px.line(
+                    df_history, x="Round", y="Score", color="Entity", markers=True,
+                    line_dash="Type", title="Total Points (Lower is Better)",
+                    template="plotly_dark"
+                )
+                fig2.update_yaxes(autorange="reversed", showgrid=False, zeroline=False)
+                fig2.update_xaxes(showgrid=False, zeroline=False)
+                fig2.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)', 
+                    plot_bgcolor='rgba(0,0,0,0)', 
+                    font=dict(family="Outfit"),
+                    hovermode="x unified",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                )
+                st.plotly_chart(fig2, use_container_width=True)
 
 with tab2:
     st.header("Prediction Breakdown")
@@ -342,36 +381,53 @@ with tab2:
     options = ["Live AFL Ladder"] + ALL_ENTITIES
     selected_view = st.selectbox("Select a participant or view the Live Ladder:", options)
     
-    if selected_view == "Live AFL Ladder":
-        st.subheader("Live AFL Ladder")
-        df_live_display = pd.DataFrame(live_ladder_raw)
-        if not df_live_display.empty:
-            df_live_display = df_live_display[['rank', 'name', 'pts', 'percentage']]
-            df_live_display.columns = ['Rank', 'Team', 'Premiership Points', 'Percentage (%)']
-            st.dataframe(df_live_display, use_container_width=True, hide_index=True)
-    else:
-        st.subheader(f"Damage Breakdown for {selected_view}")
-        
-        # Calculate current damage based on LIVE ladder
-        total_score, breakdown = calculate_score(PREDICTIONS[selected_view], live_ladder)
-        
-        st.metric(label="Current Total Score", value=total_score, delta="Lower is better", delta_color="off")
-        
-        df_breakdown = pd.DataFrame(breakdown)
-        
-        # Sort by actual rank conceptually, but predicting order makes sense too
-        df_breakdown = df_breakdown.sort_values("Predicted Rank")
-        
-        def highlight_damage(val):
-            if val <= 0:
-                color = '#4ade80' # Green
-            elif val <= 3:
-                color = '#facc15' # Yellow
-            else:
-                color = '#f87171' # Red
-            return f'background-color: {color}; color: black;'
+    
+    # Constrain layout for a better look on wide screens
+    col_table, col_empty = st.columns([2, 1])
+    
+    with col_table:
+        if selected_view == "Live AFL Ladder":
+            st.subheader("Live AFL Ladder")
+            df_live_display = pd.DataFrame(live_ladder_raw)
+            if not df_live_display.empty:
+                # Build custom HTML table
+                html_table = '<div class="table-wrapper"><table class="modern-table">'
+                html_table += '<thead><tr><th>Rank</th><th>Team</th><th>Pts</th><th>%</th></tr></thead><tbody>'
+                for _, row in df_live_display.iterrows():
+                    html_table += f"<tr><td>{row['rank']}</td><td><strong>{row['name']}</strong></td><td>{row['pts']}</td><td>{row['percentage']:.1f}</td></tr>"
+                html_table += '</tbody></table></div>'
+                st.markdown(html_table, unsafe_allow_html=True)
+                
+        else:
+            st.subheader(f"Damage Breakdown for {selected_view}")
+            
+            # Calculate current damage based on LIVE ladder
+            total_score, breakdown = calculate_score(PREDICTIONS[selected_view], live_ladder)
+            
+            st.metric(label="Current Total Score", value=total_score, delta="Lower is better", delta_color="off")
+            
+            df_breakdown = pd.DataFrame(breakdown)
+            df_breakdown = df_breakdown.sort_values("Predicted Rank")
+            
+            # Build custom HTML table for breakdown
+            html_table = '<div class="table-wrapper"><table class="modern-table">'
+            html_table += '<thead><tr><th>Team</th><th>Pred Rank</th><th>Act Rank</th><th>Damage</th></tr></thead><tbody>'
+            for _, row in df_breakdown.iterrows():
+                dmg = row['Damage']
+                if dmg <= 0:
+                    tag = "tag-green"
+                elif dmg <= 3:
+                    tag = "tag-yellow"
+                else:
+                    tag = "tag-red"
+                    
+                html_table += f"<tr>"
+                html_table += f"<td><strong>{row['Team']}</strong></td>"
+                html_table += f"<td>{row['Predicted Rank']}</td>"
+                html_table += f"<td>{row['Actual Rank']}</td>"
+                html_table += f"<td><span class='{tag}'>{dmg}</span></td>"
+                html_table += f"</tr>"
+            html_table += '</tbody></table></div>'
+            st.markdown(html_table, unsafe_allow_html=True)
 
-        # Using Pandas styling for conditional formatting
-        styled_df = df_breakdown.style.map(highlight_damage, subset=['Damage'])
-        st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
