@@ -212,8 +212,15 @@ def get_completed_rounds(games):
         return []
     return sorted(list(set(completed)))
 
+TEAM_NAME_MAPPING = {
+    "Sydney": "Sydney Swans",
+    "Greater Western Sydney": "GWS GIANTS",
+    "Gold Coast": "Gold Coast SUNS",
+    "West Coast": "West Coast Eagles"
+}
+
 def extract_team_order(ladder_data):
-    return [t['name'] for t in ladder_data]
+    return [TEAM_NAME_MAPPING.get(t['name'], t['name']) for t in ladder_data]
 
 def calculate_score(predicted_ladder, actual_ladder):
     total_score = 0
@@ -394,7 +401,8 @@ with tab2:
                 html_table = '<div class="table-wrapper"><table class="modern-table">'
                 html_table += '<thead><tr><th>Rank</th><th>Team</th><th>Pts</th><th>%</th></tr></thead><tbody>'
                 for _, row in df_live_display.iterrows():
-                    html_table += f"<tr><td>{row['rank']}</td><td><strong>{row['name']}</strong></td><td>{row['pts']}</td><td>{row['percentage']:.1f}</td></tr>"
+                    team_name = TEAM_NAME_MAPPING.get(row['name'], row['name'])
+                    html_table += f"<tr><td>{row['rank']}</td><td><strong>{team_name}</strong></td><td>{row['pts']}</td><td>{row['percentage']:.1f}</td></tr>"
                 html_table += '</tbody></table></div>'
                 st.markdown(html_table, unsafe_allow_html=True)
                 
