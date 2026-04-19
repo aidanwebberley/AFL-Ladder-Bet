@@ -154,7 +154,7 @@ PREDICTIONS = {
 }
 
 # Automatically add Benchmark
-PREDICTIONS["Alphabetical"] = sorted(PREDICTIONS["Antony"])
+PREDICTIONS["Alphabetical"] = ["Adelaide", "Brisbane Lions", "Carlton", "Collingwood", "Essendon", "Fremantle", "Geelong", "Gold Coast SUNS", "GWS GIANTS", "Hawthorn", "Melbourne", "North Melbourne", "Port Adelaide", "Richmond", "St Kilda", "Sydney Swans", "Western Bulldogs", "West Coast Eagles"]   
 
 HUMANS = ["Antony", "Slammy", "Aidos", "Coz", "Fry", "Prince"]
 BENCHMARKS = ["Last Year H+A", "Last Year Finals", "Alphabetical"]
