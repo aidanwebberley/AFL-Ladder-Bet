@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap');
+    
+    body { font-family: 'Outfit', sans-serif; margin: 0; padding: 0; background: transparent; }
+    .list { display: flex; flex-direction: column; gap: 4px; padding-bottom: 15px;}
+    .item { 
+      display: flex; align-items: center; 
+      padding: 6px 12px; border-radius: 8px; 
+      cursor: grab; user-select: none;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      transition: transform 0.1s, box-shadow 0.1s;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .item:active { cursor: grabbing; transform: scale(1.01); box-shadow: 0 6px 15px rgba(0,0,0,0.4); }
+    .rank { margin-right: 12px; font-weight: 800; font-size: 1.1rem; width: 20px; text-align: right; opacity: 0.9;}
+    .logo { width: 24px; height: 24px; margin-right: 12px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3)); }
+    .name { flex-grow: 1; font-weight: 700; font-size: 1.05rem; letter-spacing: 0.3px;}
+  </style>
+</head>
+<body>
+  <div id="list" class="list"></div>
+  <script>
+    function sendMessage(type, data) {
+      window.parent.postMessage(Object.assign({isStreamlitMessage: true, type: type}, data), "*");
+    }
+    
+    let currentLadder = [];
+    let isInitialized = false;
+
+    window.addEventListener("message", function(event) {
+      if (event.data.type === "streamlit:render") {
+        const args = event.data.args;
+        if (!isInitialized) {
+            currentLadder = args.teams; 
+            renderLadder();
+            isInitialized = true;
+        }
+        sendMessage("streamlit:setFrameHeight", {height: document.body.scrollHeight});
+      }
+    });
+
+    sendMessage("streamlit:componentReady", {apiVersion: 1});
+
+    function renderLadder() {
+      const listDiv = document.getElementById("list");
+      listDiv.innerHTML = "";
+      currentLadder.forEach((team, index) => {
+        const item = document.createElement("div");
+        item.className = "item";
+        item.style.backgroundColor = team.bg;
+        item.style.color = team.text;
+        item.dataset.name = team.name; // to extract later
+        
+        item.innerHTML = `
+          <div class="rank">${index + 1}</div>
+          <img class="logo" src="${team.logo}">
+          <div class="name">${team.name}</div>
+        `;
+        listDiv.appendChild(item);
+      });
+      
+      new Sortable(listDiv, {
+          animation: 150,
+          ghostClass: 'sortable-ghost',
+          onEnd: function () {
+              // Extract new order
+              const items = listDiv.querySelectorAll('.item');
+              const newOrder = [];
+              items.forEach((it, i) => {
+                  newOrder.push(it.dataset.name);
+                  // Update visually the ranks immediately
+                  it.querySelector('.rank').innerText = i + 1;
+              });
+              sendMessage("streamlit:setComponentValue", {value: newOrder, dataType: "json"});
+              sendMessage("streamlit:setFrameHeight", {height: document.body.scrollHeight});
+          }
+      });
+      // Send initial value back immediately
+      sendMessage("streamlit:setComponentValue", {value: currentLadder.map(t => t.name), dataType: "json"});
+    }
+  </script>
+</body>
+</html>

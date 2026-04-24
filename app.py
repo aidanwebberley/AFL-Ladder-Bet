@@ -4,6 +4,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import requests
 import datetime
+import os
+import streamlit.components.v1 as components
 
 # --- CONFIG & CONSTANTS ---
 st.set_page_config(page_title="AFL Ladder Bet", layout="wide", page_icon="🏉")
@@ -25,6 +27,10 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+    
+    [data-testid="stAppViewBlockContainer"] {
+        padding-top: 1rem;
+    }
 
     /* Premium Ladder Styles */
     .ladder-container {
@@ -40,7 +46,7 @@ st.markdown("""
         background: rgba(255, 255, 255, 0.03);
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 16px;
-        padding: 16px 24px;
+        padding: 12px 20px;
         transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
         box-shadow: 0 4px 20px rgba(0,0,0,0.2);
     }
@@ -63,14 +69,15 @@ st.markdown("""
         gap: 20px;
     }
     .ladder-rank {
-        font-size: 1.8rem;
+        font-size: 1.6rem;
         font-weight: 800;
         color: #475569;
-        width: 30px;
+        width: 45px;
         text-align: right;
+        white-space: nowrap;
     }
     .ladder-name {
-        font-size: 1.5rem;
+        font-size: 1.3rem;
         font-weight: 600;
         color: #f8fafc;
     }
@@ -85,7 +92,7 @@ st.markdown("""
         text-align: right;
     }
     .ladder-score {
-        font-size: 2rem;
+        font-size: 1.7rem;
         font-weight: 800;
         color: #f8fafc;
         text-shadow: 0 0 10px rgba(255,255,255,0.2);
@@ -139,8 +146,46 @@ st.markdown("""
     .tag-green { background: rgba(5,150,105,0.2); color: #34d399; border: 1px solid rgba(5,150,105,0.5); padding: 4px 10px; border-radius: 8px; font-weight:700; display: inline-block;}
     .tag-yellow { background: rgba(217,119,6,0.2); color: #fbbf24; border: 1px solid rgba(217,119,6,0.5); padding: 4px 10px; border-radius: 8px; font-weight:700; display: inline-block;}
     .tag-red { background: rgba(220,38,38,0.2); color: #f87171; border: 1px solid rgba(220,38,38,0.5); padding: 4px 10px; border-radius: 8px; font-weight:700; display: inline-block;}
+    
+    .delta-text {
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-left: 8px;
+    }
+    .delta-green { color: #34d399; }
+    .delta-yellow { color: #fbbf24; }
+    .delta-red { color: #f87171; }
+    
+    /* Primary button override */
+    [data-testid="stButton"] button[kind="primary"] {
+        background-color: #38bdf8 !important;
+        border-color: #38bdf8 !important;
+        color: #070b10 !important;
+        font-weight: 700 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+TEAM_STYLES = {
+    "Adelaide": {"bg": "#002b5c", "text": "#ffd200", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/Adelaide.png"},
+    "Brisbane Lions": {"bg": "#6e0e2d", "text": "#f3ba1c", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/Brisbane.png"},
+    "Carlton": {"bg": "#031a29", "text": "#ffffff", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/Carlton.png"},
+    "Collingwood": {"bg": "#000000", "text": "#ffffff", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/Collingwood.png"},
+    "Essendon": {"bg": "#000000", "text": "#cc2031", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/Essendon.png"},
+    "Fremantle": {"bg": "#2a1a54", "text": "#ffffff", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/Fremantle.png"},
+    "Geelong": {"bg": "#1c3c63", "text": "#ffffff", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/Geelong.png"},
+    "Gold Coast SUNS": {"bg": "#d71920", "text": "#facc15", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/GoldCoast.png"},
+    "GWS GIANTS": {"bg": "#f47920", "text": "#ffffff", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/Giants.png"},
+    "Hawthorn": {"bg": "#4d2004", "text": "#facc15", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/Hawthorn.png"},
+    "Melbourne": {"bg": "#0f112e", "text": "#cc2031", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/Melbourne.png"},
+    "North Melbourne": {"bg": "#013b6e", "text": "#ffffff", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/NorthMelbourne.png"},
+    "Port Adelaide": {"bg": "#000000", "text": "#008a97", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/PortAdelaide.png"},
+    "Richmond": {"bg": "#000000", "text": "#ffd200", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/Richmond.png"},
+    "St Kilda": {"bg": "#000000", "text": "#ffffff", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/StKilda.png"},
+    "Sydney Swans": {"bg": "#ed171f", "text": "#ffffff", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/Sydney.png"},
+    "West Coast Eagles": {"bg": "#002b5c", "text": "#facc15", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/WestCoast.png"},
+    "Western Bulldogs": {"bg": "#014896", "text": "#ffffff", "logo": "https://squiggle.com.au/wp-content/themes/squiggle/assets/images/Bulldogs.png"}
+}
 
 PREDICTIONS = {
     "Antony": ["Geelong", "Brisbane Lions", "Hawthorn", "Sydney Swans", "Western Bulldogs", "Adelaide", "Gold Coast SUNS", "Fremantle", "Collingwood", "GWS GIANTS", "St Kilda", "Melbourne", "Carlton", "Port Adelaide", "North Melbourne", "Essendon", "Richmond", "West Coast Eagles"],
@@ -150,14 +195,15 @@ PREDICTIONS = {
     "Fry": ["Sydney Swans", "Brisbane Lions", "Geelong", "Hawthorn", "Collingwood", "Gold Coast SUNS", "Adelaide", "GWS GIANTS", "Western Bulldogs", "Fremantle", "Port Adelaide", "St Kilda", "Melbourne", "Essendon", "Richmond", "Carlton", "North Melbourne", "West Coast Eagles"],
     "Prince": ["Brisbane Lions", "Geelong", "Western Bulldogs", "Hawthorn", "Collingwood", "GWS GIANTS", "Adelaide", "Gold Coast SUNS", "Fremantle", "Sydney Swans", "Melbourne", "Carlton", "Port Adelaide", "St Kilda", "North Melbourne", "Richmond", "Essendon", "West Coast Eagles"],
     "Last Year H+A": ["Adelaide", "Geelong", "Brisbane Lions", "Collingwood", "GWS GIANTS", "Fremantle", "Gold Coast SUNS", "Hawthorn", "Western Bulldogs", "Sydney Swans", "Carlton", "St Kilda", "Port Adelaide", "Melbourne", "Essendon", "North Melbourne", "Richmond", "West Coast Eagles"],
-    "Last Year Finals": ["Brisbane Lions", "Geelong", "Collingwood", "Hawthorn", "Adelaide", "Gold Coast SUNS", "GWS GIANTS", "Fremantle", "Western Bulldogs", "Sydney Swans", "Carlton", "St Kilda", "Port Adelaide", "Melbourne", "Essendon", "North Melbourne", "Richmond", "West Coast Eagles"]
+    "Last Year Finals": ["Brisbane Lions", "Geelong", "Collingwood", "Hawthorn", "Adelaide", "Gold Coast SUNS", "GWS GIANTS", "Fremantle", "Western Bulldogs", "Sydney Swans", "Carlton", "St Kilda", "Port Adelaide", "Melbourne", "Essendon", "North Melbourne", "Richmond", "West Coast Eagles"],
+    "Cromputer": ["Brisbane Lions", "Western Bulldogs", "Hawthorn", "Geelong", "Adelaide", "Gold Coast SUNS", "Fremantle", "Sydney Swans", "Collingwood", "GWS GIANTS", "St Kilda", "Carlton", "Port Adelaide", "Melbourne", "Essendon", "North Melbourne", "Richmond", "West Coast Eagles"]
 }
 
 # Automatically add Benchmark
 PREDICTIONS["Alphabetical"] = sorted(PREDICTIONS["Antony"])
 
 HUMANS = ["Antony", "Slammy", "Aidos", "Coz", "Fry", "Prince"]
-BENCHMARKS = ["Last Year H+A", "Last Year Finals", "Alphabetical"]
+BENCHMARKS = ["Last Year H+A", "Last Year Finals", "Alphabetical", "Cromputer"]
 ALL_ENTITIES = HUMANS + BENCHMARKS
 
 # Fall back to 2026 as per our environment defaults if needed, but best is to dynamically retrieve
@@ -264,7 +310,7 @@ if not live_ladder:
     st.stop()
 
 # Tabs
-tab1, tab2 = st.tabs(["📊 Season Tracking", "🎯 Prediction Breakdown"])
+tab1, tab2, tab3 = st.tabs(["📊 Season Tracking", "🎯 Prediction Breakdown", "🔮 Ladder Predictor"])
 
 with tab1:
     st.header("Season Leaderboard")
@@ -298,31 +344,113 @@ with tab1:
         if historical_scores:
             df_history = pd.DataFrame(historical_scores)
             
-            # Use the very latest ladder for the live scoreboard
+            # --- Round Selector ---
+            # Using columns to not make selectbox too wide
+            rs_col, _ = st.columns([1, 3])
+            with rs_col:
+                round_options = ["Live"] + [f"Round {r}" for r in completed_rounds]
+                selected_round_str = st.selectbox("Select Round:", round_options)
+            
+            is_live = selected_round_str == "Live"
+            
+            # Find Active Round
+            active_round = 0
+            if games:
+                active_round = max([g.get('round', 0) for g in games if g.get('complete', 0) > 0], default=0)
+            
+            # Determine target ladder
+            if is_live:
+                target_ladder = live_ladder
+                header_text = "Current live leaderboard"
+            else:
+                rd_num = int(selected_round_str.split(" ")[1])
+                target_ladder = extract_team_order(fetch_historical_ladder(YEAR, rd_num))
+                header_text = f"Leaderboard after {selected_round_str.lower()}"
+                
+            # Determine previous round ladder for deltas
+            prev_ladder = None
+            delta_explainer = ""
+            if is_live:
+                baseline_round = active_round - 1
+                if baseline_round > 0:
+                    prev_ladder = extract_team_order(fetch_historical_ladder(YEAR, baseline_round))
+                    delta_explainer = f"Changes in damage and rank are since the end of round {baseline_round}"
+            else:
+                rd_num = int(selected_round_str.split(" ")[1])
+                try:
+                    prev_idx = completed_rounds.index(rd_num) - 1
+                    if prev_idx >= 0:
+                        baseline_round = completed_rounds[prev_idx]
+                        prev_ladder = extract_team_order(fetch_historical_ladder(YEAR, baseline_round))
+                        delta_explainer = f"Changes in damage and rank are since the end of round {baseline_round}"
+                except ValueError:
+                    pass
+            
+            # Calculate Target Scores
             current_scores = []
             for entity in ALL_ENTITIES:
-                score, _ = calculate_score(PREDICTIONS[entity], live_ladder)
+                score, _ = calculate_score(PREDICTIONS[entity], target_ladder)
                 current_scores.append({
                     "Entity": entity,
                     "Score": score,
                     "Type": "Human" if entity in HUMANS else "Benchmark"
                 })
-            df_live = pd.DataFrame(current_scores).sort_values(by="Score").reset_index(drop=True)
+            df_target = pd.DataFrame(current_scores).sort_values(by="Score").reset_index(drop=True)
+            
+            # Calculate Previous Scores for Delta
+            prev_scores_dict = {}
+            prev_rank_dict = {}
+            if prev_ladder:
+                for entity in ALL_ENTITIES:
+                    score, _ = calculate_score(PREDICTIONS[entity], prev_ladder)
+                    prev_scores_dict[entity] = score
+                    
+                prev_df = pd.DataFrame([{"Entity": e, "Score": s} for e, s in prev_scores_dict.items()]).sort_values(by="Score").reset_index(drop=True)
+                for idx, row in prev_df.iterrows():
+                    prev_rank_dict[row['Entity']] = idx + 1
 
             # Create columns: Left for Ladder (1 part), Right for Graphs (2 parts)
             col_ladder, col_graphs = st.columns([1, 2])
 
             with col_ladder:
-                st.subheader("Current Live Leaderboard")
+                st.subheader(header_text)
+                if delta_explainer:
+                    st.markdown(f"<div style='margin-top:-10px; margin-bottom:15px; font-size:0.9rem; color:#94a3b8;'>{delta_explainer}</div>", unsafe_allow_html=True)
                 
                 # Generate Custom HTML Ladder
                 html_ladder = '<div class="ladder-container">\n'
-                for idx, row in df_live.iterrows():
+                for idx, row in df_target.iterrows():
                     rank = idx + 1
                     entity_name = row['Entity']
                     score = row['Score']
                     entity_type = row['Type'].lower()  # 'human' or 'benchmark'
                     
+                    # Deltas logic
+                    delta_html = ""
+                    if not prev_ladder:
+                        # Round 0 fallback
+                        delta_html = f"""<div style="display:flex; justify-content:flex-end; align-items:center;">
+                            <span class="delta-text delta-yellow">ΔDmg: 0</span> <span style="color:#475569; margin: 0 4px;">|</span> <span class="delta-text delta-yellow">ΔRank: 0</span>
+                        </div>"""
+                    else:
+                        prev_score = prev_scores_dict.get(entity_name, score)
+                        prev_rank = prev_rank_dict.get(entity_name, rank)
+                        
+                        dmg_diff = score - prev_score
+                        rank_diff = prev_rank - rank # Positive means rank improved (smaller digit)
+                        
+                        dmg_color = "delta-green" if dmg_diff < 0 else ("delta-yellow" if dmg_diff == 0 else "delta-red")
+                        dmg_sign = "+" if dmg_diff > 0 else ""
+                        
+                        rank_color = "delta-green" if rank_diff > 0 else ("delta-yellow" if rank_diff == 0 else "delta-red")
+                        rank_sign = "+" if rank_diff > 0 else ""
+                        
+                        delta_html = f"""<div style="display:flex; justify-content:flex-end; align-items:center;">
+                            <span class="delta-text {dmg_color}">ΔDmg: {dmg_sign}{int(dmg_diff)}</span>
+                            <span style="color:#475569; margin: 0 4px;">|</span>
+                            <span class="delta-text {rank_color}">ΔRank: {rank_sign}{int(rank_diff)}</span>
+                        </div>"""
+
                     # Assign crowns/medals to top 3
                     rank_display = f"#{rank}"
                     if rank == 1: rank_display = "🥇"
@@ -336,8 +464,11 @@ with tab1:
 <div class="ladder-name">{entity_name}</div>
 </div>
 <div class="ladder-right">
+<div style="display: flex; align-items: baseline; justify-content: flex-end; gap: 8px;">
 <div class="ladder-score">{int(score)}</div>
 <div class="ladder-sub">DAMAGE</div>
+</div>
+{delta_html}
 </div>
 </div>\n"""
                 html_ladder += '</div>'
@@ -353,16 +484,16 @@ with tab1:
                     template="plotly_dark",
                     line_shape="spline"
                 )
-                fig1.update_yaxes(autorange="reversed", showgrid=False, zeroline=False) # Lower score is better
-                fig1.update_xaxes(showgrid=False, zeroline=False)
+                fig1.update_yaxes(autorange="reversed", showgrid=False, zeroline=False, fixedrange=True) # Lower score is better
+                fig1.update_xaxes(showgrid=False, zeroline=False, fixedrange=True)
                 fig1.update_layout(
                     paper_bgcolor='rgba(0,0,0,0)', 
                     plot_bgcolor='rgba(0,0,0,0)', 
                     font=dict(family="Outfit"),
                     hovermode="x unified",
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                    legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5)
                 )
-                st.plotly_chart(fig1, use_container_width=True)
+                st.plotly_chart(fig1, use_container_width=True, config={'displayModeBar': False})
                 
                 # --- Graph 2: The Full Field ---
                 st.subheader("Full Field (Including Benchmarks)")
@@ -371,23 +502,26 @@ with tab1:
                     line_dash="Type", title="Total Points (Lower is Better)",
                     template="plotly_dark"
                 )
-                fig2.update_yaxes(autorange="reversed", showgrid=False, zeroline=False)
-                fig2.update_xaxes(showgrid=False, zeroline=False)
+                fig2.update_yaxes(autorange="reversed", showgrid=False, zeroline=False, fixedrange=True)
+                fig2.update_xaxes(showgrid=False, zeroline=False, fixedrange=True)
                 fig2.update_layout(
                     paper_bgcolor='rgba(0,0,0,0)', 
                     plot_bgcolor='rgba(0,0,0,0)', 
                     font=dict(family="Outfit"),
                     hovermode="x unified",
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                    legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5)
                 )
-                st.plotly_chart(fig2, use_container_width=True)
+                st.plotly_chart(fig2, use_container_width=True, config={'displayModeBar': False})
+
 
 with tab2:
     st.header("Prediction Breakdown")
     
-    options = ["Live AFL Ladder"] + ALL_ENTITIES
-    selected_view = st.selectbox("Select a participant or view the Live Ladder:", options)
-    
+    # Use columns to constrain dropdown width on desktop
+    c_dropdown, _ = st.columns([1, 2])
+    with c_dropdown:
+        options = ["Live AFL Ladder"] + ALL_ENTITIES
+        selected_view = st.selectbox("Select participant or view Live Ladder:", options)
     
     # Constrain layout for a better look on wide screens
     col_table, col_empty = st.columns([2, 1])
@@ -437,5 +571,56 @@ with tab2:
                 html_table += f"</tr>"
             html_table += '</tbody></table></div>'
             st.markdown(html_table, unsafe_allow_html=True)
+
+
+with tab3:
+    st.header("Ladder Predictor")
+    st.write("Drag and drop the teams into your predicted final ladder to see how everyone scores against it.")
+    
+    col_drag, col_results = st.columns([1, 1])
+    
+    with col_drag:
+        st.subheader("Build Final Ladder")
+        
+        # Build local component
+        custom_sortable_path = os.path.join(os.path.dirname(__file__), "custom_sortable")
+        afl_sortable = components.declare_component("afl_sortable", path=custom_sortable_path)
+
+        # Initialize state if not present
+        if 'custom_ladder' not in st.session_state:
+            st.session_state.custom_ladder = live_ladder.copy()
+            
+        teams_data = []
+        for t in st.session_state.custom_ladder:
+            info = TEAM_STYLES.get(t, {"bg": "#ffffff", "text": "#000000", "logo": ""})
+            teams_data.append({"name": t, "bg": info["bg"], "text": info["text"], "logo": info["logo"]})
+            
+        custom_ladder = afl_sortable(teams=teams_data, default=st.session_state.custom_ladder)
+        
+        # update state for next render so it remembers order if we leave
+        if custom_ladder:
+            st.session_state.custom_ladder = custom_ladder
+    
+    with col_results:
+        st.subheader("Predicted Result")
+        if st.button("Calculate Prediction", type="primary"):
+            custom_scores = []
+            for entity in ALL_ENTITIES:
+                score, _ = calculate_score(PREDICTIONS[entity], custom_ladder)
+                custom_scores.append({
+                    "Participant": entity,
+                    "Damage": score,
+                    "Type": "Human" if entity in HUMANS else "Benchmark"
+                })
+            
+            df_custom = pd.DataFrame(custom_scores).sort_values("Damage").reset_index(drop=True)
+            df_custom.index += 1 # 1-indexed ranks
+            
+            html_custom = '<div class="table-wrapper"><table class="modern-table">'
+            html_custom += '<thead><tr><th>Rank</th><th>Participant</th><th>Type</th><th>Total Damage</th></tr></thead><tbody>'
+            for rank, row in df_custom.iterrows():
+                html_custom += f"<tr><td>{rank}</td><td><strong>{row['Participant']}</strong></td><td>{row['Type']}</td><td>{int(row['Damage'])}</td></tr>"
+            html_custom += '</tbody></table></div>'
+            st.markdown(html_custom, unsafe_allow_html=True)
 
 
