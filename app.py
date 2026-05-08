@@ -6,6 +6,8 @@ import requests
 import datetime
 import os
 import streamlit.components.v1 as components
+import base64
+import io
 
 # --- CONFIG & CONSTANTS ---
 st.set_page_config(page_title="AFL Ladder Bet", layout="wide", page_icon="🏉")
@@ -251,6 +253,174 @@ def fetch_historical_ladder(year, round_num):
         pass
     return []
 
+def get_poster_html(df_target, df_history, round_name):
+    # Convert dataframes to JSON for use in Javascript
+    leaderboard_data = df_target.head(10).to_json(orient="records")
+    
+    # Filter and prepare history data for both graphs
+    df_humans = df_history[df_history["Type"] == "Human"]
+    history_humans_json = df_humans.to_json(orient="records")
+    history_all_json = df_history.to_json(orient="records")
+
+    # Build a compact leaderboard HTML for the static part
+    lb_rows = ""
+    for idx, row in df_target.head(10).iterrows():
+        rank = idx + 1
+        name = row['Entity']
+        score = int(row['Score'])
+        color = "#38bdf8" if row['Type'] == "Human" else "#facc15"
+        rank_icon = "🥇" if rank == 1 else ("🥈" if rank == 2 else ("🥉" if rank == 3 else f"#{rank}"))
+        
+        lb_rows += f"""
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-weight: 800; color: #475569; width: 25px;">{rank_icon}</span>
+                <span style="font-weight: 600; color: {color};">{name}</span>
+            </div>
+            <div style="font-weight: 800; font-size: 1.1rem;">{score}</div>
+        </div>
+        """
+
+    date_str = datetime.datetime.now().strftime("%d %b %Y")
+    
+    html = f"""
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+        body {{ margin: 0; padding: 20px; background: #070b10; font-family: 'Outfit', sans-serif; }}
+        #poster {{
+            width: 1000px;
+            padding: 50px;
+            background: linear-gradient(135deg, #070b10 0%, #0f172a 100%);
+            color: white;
+            border-radius: 40px;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
+            overflow: hidden;
+        }}
+        .header {{ display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 50px; position: relative; }}
+        .title-group h1 {{ margin: 0; font-size: 52px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(90deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }}
+        .title-group p {{ margin: 8px 0 0 0; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 4px; font-size: 16px; }}
+        .round-badge {{ background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); padding: 10px 20px; border-radius: 16px; color: #38bdf8; font-weight: 700; font-size: 18px; }}
+        
+        .main-grid {{ display: grid; grid-template-columns: 380px 1fr; gap: 40px; margin-bottom: 40px; }}
+        .card {{ background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 28px; padding: 32px; }}
+        .card-title {{ margin: 0 0 20px 0; color: #38bdf8; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; }}
+        
+        .footer {{ text-align: center; color: #475569; font-size: 14px; margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 30px; }}
+        
+        .btn-container {{ margin-bottom: 20px; display: flex; gap: 10px; }}
+        .download-btn {{
+            background: #38bdf8;
+            color: #070b10;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: 'Outfit', sans-serif;
+            transition: all 0.2s;
+        }}
+        .download-btn:hover {{ background: #7dd3fc; transform: translateY(-1px); }}
+    </style>
+
+    <div class="btn-container">
+        <button class="download-btn" onclick="downloadPoster()">⬇️ Download High-Res .JPG</button>
+        <span style="color: #94a3b8; font-size: 14px; align-self: center;">Generating at 4x scale for maximum clarity.</span>
+    </div>
+
+    <div id="poster">
+        <div class="header">
+            <div class="title-group">
+                <h1>AFL LADDER BET</h1>
+                <p>Champions League Edition</p>
+            </div>
+            <div class="round-badge">{round_name.upper()}</div>
+        </div>
+        
+        <div class="main-grid">
+            <div class="card">
+                <h3 class="card-title">Top 10 Leaderboard</h3>
+                {lb_rows}
+            </div>
+            <div class="card" style="display: flex; flex-direction: column; justify-content: center; padding: 20px;">
+                <h3 class="card-title" style="margin-left: 14px;">Competitor Progression</h3>
+                <div id="graph1" style="width: 100%; height: 400px;"></div>
+            </div>
+        </div>
+        
+        <div class="card" style="padding: 20px;">
+            <h3 class="card-title" style="margin: 14px;">Full Field Performance</h3>
+            <div id="graph2" style="width: 100%; height: 400px;"></div>
+        </div>
+
+        <div class="footer">
+            Generated on {date_str} • Good luck for the rest of the season! 🏉
+        </div>
+    </div>
+
+    <script>
+    const historyHumans = {history_humans_json};
+    const historyAll = {history_all_json};
+
+    function createGraph(id, data, title) {{
+        const entities = [...new Set(data.map(d => d.Entity))];
+        const traces = entities.map(entity => {{
+            const entityData = data.filter(d => d.Entity === entity);
+            return {{
+                x: entityData.map(d => d.Round),
+                y: entityData.map(d => d.Score),
+                name: entity,
+                mode: 'lines+markers',
+                line: {{ shape: 'spline', width: 3 }},
+                marker: {{ size: 8 }}
+            }};
+        }});
+
+        const layout = {{
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            margin: {{ l: 50, r: 30, t: 20, b: 50 }},
+            font: {{ family: 'Outfit', color: '#94a3b8', size: 12 }},
+            xaxis: {{ showgrid: false, zeroline: false }},
+            yaxis: {{ autorange: 'reversed', showgrid: false, zeroline: false }},
+            showlegend: true,
+            legend: {{ orientation: 'h', y: -0.2, x: 0.5, xanchor: 'center', font: {{ size: 11 }} }}
+        }};
+
+        Plotly.newPlot(id, traces, layout, {{ staticPlot: true, responsive: true }});
+    }}
+
+    // Initial render
+    window.onload = () => {{
+        createGraph('graph1', historyHumans, 'Competitors Only');
+        createGraph('graph2', historyAll, 'Full Field');
+    }};
+
+    async function downloadPoster() {{
+        const poster = document.getElementById('poster');
+        
+        // Use html2canvas to capture the element at high scale
+        html2canvas(poster, {{
+            scale: 4,
+            backgroundColor: '#070b10',
+            logging: false,
+            useCORS: true,
+            allowTaint: true,
+            imageTimeout: 0
+        }}).then(canvas => {{
+            const link = document.createElement('a');
+            link.download = 'AFL-Ladder-Bet-HighRes-{round_name.replace(" ", "-")}.jpg';
+            link.href = canvas.toDataURL('image/jpeg', 0.95);
+            link.click();
+        }});
+    }}
+    </script>
+    """
+    return html
+
 # --- DATA PROCESSING ---
 def get_completed_rounds(games):
     completed = [g['round'] for g in games if g.get('complete', 0) == 100]
@@ -344,12 +514,17 @@ with tab1:
         if historical_scores:
             df_history = pd.DataFrame(historical_scores)
             
-            # --- Round Selector ---
-            # Using columns to not make selectbox too wide
-            rs_col, _ = st.columns([1, 3])
+            # --- Round Selector & Share ---
+            rs_col, share_col, _ = st.columns([1, 1, 2])
             with rs_col:
                 round_options = ["Live"] + [f"Round {r}" for r in completed_rounds]
                 selected_round_str = st.selectbox("Select Round:", round_options)
+            
+            with share_col:
+                st.write("") # Alignment
+                st.write("")
+                if st.button("📸 Create Shareable Dashboard", key="share_btn"):
+                    st.session_state.show_share_view = True
             
             is_live = selected_round_str == "Live"
             
@@ -408,6 +583,41 @@ with tab1:
                 prev_df = pd.DataFrame([{"Entity": e, "Score": s} for e, s in prev_scores_dict.items()]).sort_values(by="Score").reset_index(drop=True)
                 for idx, row in prev_df.iterrows():
                     prev_rank_dict[row['Entity']] = idx + 1
+
+            # --- Prepare Graphs ---
+            # --- Graph 1: Competitors Only ---
+            df_humans = df_history[df_history["Type"] == "Human"]
+            fig1 = px.line(
+                df_humans, x="Round", y="Score", color="Entity", markers=True,
+                title="Total Points (Lower is Better)",
+                template="plotly_dark",
+                line_shape="spline"
+            )
+            fig1.update_yaxes(autorange="reversed", showgrid=False, zeroline=False, fixedrange=True) # Lower score is better
+            fig1.update_xaxes(showgrid=False, zeroline=False, fixedrange=True)
+            fig1.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)', 
+                plot_bgcolor='rgba(0,0,0,0)', 
+                font=dict(family="Outfit"),
+                hovermode="x unified",
+                legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5)
+            )
+            
+            # --- Graph 2: The Full Field ---
+            fig2 = px.line(
+                df_history, x="Round", y="Score", color="Entity", markers=True,
+                line_dash="Type", title="Total Points (Lower is Better)",
+                template="plotly_dark"
+            )
+            fig2.update_yaxes(autorange="reversed", showgrid=False, zeroline=False, fixedrange=True)
+            fig2.update_xaxes(showgrid=False, zeroline=False, fixedrange=True)
+            fig2.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)', 
+                plot_bgcolor='rgba(0,0,0,0)', 
+                font=dict(family="Outfit"),
+                hovermode="x unified",
+                legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5)
+            )
 
             # Create columns: Left for Ladder (1 part), Right for Graphs (2 parts)
             col_ladder, col_graphs = st.columns([1, 2])
@@ -477,41 +687,23 @@ with tab1:
             with col_graphs:
                 # --- Graph 1: Competitors Only ---
                 st.subheader("Competitor Progression Over Time")
-                df_humans = df_history[df_history["Type"] == "Human"]
-                fig1 = px.line(
-                    df_humans, x="Round", y="Score", color="Entity", markers=True,
-                    title="Total Points (Lower is Better)",
-                    template="plotly_dark",
-                    line_shape="spline"
-                )
-                fig1.update_yaxes(autorange="reversed", showgrid=False, zeroline=False, fixedrange=True) # Lower score is better
-                fig1.update_xaxes(showgrid=False, zeroline=False, fixedrange=True)
-                fig1.update_layout(
-                    paper_bgcolor='rgba(0,0,0,0)', 
-                    plot_bgcolor='rgba(0,0,0,0)', 
-                    font=dict(family="Outfit"),
-                    hovermode="x unified",
-                    legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5)
-                )
                 st.plotly_chart(fig1, use_container_width=True, config={'displayModeBar': False})
                 
                 # --- Graph 2: The Full Field ---
                 st.subheader("Full Field (Including Benchmarks)")
-                fig2 = px.line(
-                    df_history, x="Round", y="Score", color="Entity", markers=True,
-                    line_dash="Type", title="Total Points (Lower is Better)",
-                    template="plotly_dark"
-                )
-                fig2.update_yaxes(autorange="reversed", showgrid=False, zeroline=False, fixedrange=True)
-                fig2.update_xaxes(showgrid=False, zeroline=False, fixedrange=True)
-                fig2.update_layout(
-                    paper_bgcolor='rgba(0,0,0,0)', 
-                    plot_bgcolor='rgba(0,0,0,0)', 
-                    font=dict(family="Outfit"),
-                    hovermode="x unified",
-                    legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5)
-                )
                 st.plotly_chart(fig2, use_container_width=True, config={'displayModeBar': False})
+
+            # --- Share View Rendering ---
+            if st.session_state.get('show_share_view', False):
+                st.markdown("---")
+                st.subheader("🖼️ Shareable Dashboard Preview")
+                if st.button("❌ Close Preview"):
+                    st.session_state.show_share_view = False
+                    st.rerun()
+                
+                with st.spinner("Generating high-fidelity dashboard..."):
+                    poster_html = get_poster_html(df_target, df_history, selected_round_str)
+                    components.html(poster_html, height=1000, scrolling=True)
 
 
 with tab2:
