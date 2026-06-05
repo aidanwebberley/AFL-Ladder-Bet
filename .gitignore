@@ -1,0 +1,17 @@
+# Ignore environment variables / secrets
+.env
+.streamlit/secrets.toml
+
+# Local dev helpers (not needed in the cloud)
+design_review.html
+test_api.py
+check_kaleido.py
+
+# Ignore python bytecode / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db

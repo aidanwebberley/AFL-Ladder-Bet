@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap');
+
+    body { font-family: 'Outfit', sans-serif; margin: 0; padding: 0; background: transparent; }
+    .list { display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; }
+    .item {
+      display: flex; align-items: center;
+      padding: 6px 12px; border-radius: 8px;
+      cursor: grab; user-select: none;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      transition: transform 0.1s, box-shadow 0.1s;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .item:active { cursor: grabbing; transform: scale(1.01); box-shadow: 0 6px 15px rgba(0,0,0,0.4); }
+    .rank { margin-right: 12px; font-weight: 800; font-size: 1.1rem; width: 20px; text-align: right; opacity: 0.9; }
+    .logo { width: 24px; height: 24px; margin-right: 12px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3)); }
+    .name { flex-grow: 1; font-weight: 700; font-size: 1.05rem; letter-spacing: 0.3px; }
+    .calc-btn {
+      margin-top: 10px;
+      width: 100%;
+      padding: 10px 0;
+      background: #38bdf8;
+      color: #070b10;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .calc-btn:hover { background: #7dd3fc; transform: translateY(-1px); }
+    .calc-btn:active { transform: scale(0.98); }
+  </style>
+</head>
+<body>
+  <div id="list" class="list"></div>
+  <button class="calc-btn" onclick="calculate()">Calculate Scores &#x2192;</button>
+  <script>
+    function sendMessage(type, data) {
+      window.parent.postMessage(Object.assign({isStreamlitMessage: true, type: type}, data), "*");
+    }
+
+    let currentLadder = [];
+    let isInitialized = false;
+
+    window.addEventListener("message", function(event) {
+      if (event.data.type === "streamlit:render") {
+        const args = event.data.args;
+        if (!isInitialized) {
+            currentLadder = args.teams;
+            renderLadder();
+            isInitialized = true;
+        }
+        sendMessage("streamlit:setFrameHeight", {height: document.body.scrollHeight});
+      }
+    });
+
+    sendMessage("streamlit:componentReady", {apiVersion: 1});
+
+    function renderLadder() {
+      const listDiv = document.getElementById("list");
+      listDiv.innerHTML = "";
+      currentLadder.forEach((team, index) => {
+        const item = document.createElement("div");
+        item.className = "item";
+        item.style.backgroundColor = team.bg;
+        item.style.color = team.text;
+        item.dataset.name = team.name;
+
+        item.innerHTML = `
+          <div class="rank">${index + 1}</div>
+          <img class="logo" src="${team.logo}">
+          <div class="name">${team.name}</div>
+        `;
+        listDiv.appendChild(item);
+      });
+
+      new Sortable(listDiv, {
+          animation: 150,
+          ghostClass: 'sortable-ghost',
+          onEnd: function () {
+              // Update rank numbers visually — no Streamlit communication here
+              const items = listDiv.querySelectorAll('.item');
+              items.forEach((it, i) => {
+                  it.querySelector('.rank').innerText = i + 1;
+              });
+              sendMessage("streamlit:setFrameHeight", {height: document.body.scrollHeight});
+          }
+      });
+
+      // Send initial order so Streamlit knows the starting state
+      sendMessage("streamlit:setComponentValue", {value: currentLadder.map(t => t.name), dataType: "json"});
+    }
+
+    function calculate() {
+      // Read current DOM order and send to Streamlit — triggers one fragment rerun
+      const items = document.getElementById("list").querySelectorAll('.item');
+      const order = Array.from(items).map(it => it.dataset.name);
+      sendMessage("streamlit:setComponentValue", {value: order, dataType: "json"});
+    }
+  </script>
+</body>
+</html>

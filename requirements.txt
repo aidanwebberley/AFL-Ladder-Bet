@@ -1,0 +1,8 @@
+streamlit
+pandas
+plotly
+requests
+kaleido==0.2.1
+Pillow
+anthropic
+python-dotenv
